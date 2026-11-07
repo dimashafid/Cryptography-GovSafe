@@ -45,6 +45,14 @@ def render_asset_catalog(user: dict) -> None:
         c1, c2 = st.columns([1, 1.2])
         with c1:
             st.image(detail["image_bytes"], use_container_width=True)
+            st.download_button(
+                label="DOWNLOAD GAMBAR",
+                data=detail["image_bytes"],
+                file_name=f"{detail['asset_code']}.png",
+                mime="image/png",
+                use_container_width=True,
+                key=f"download_govsafe_asset_{detail['id']}",
+            )
         with c2:
             st.write(detail["description"])
             st.write(f"**Kode aset:** {detail['asset_code']}")

@@ -4,6 +4,9 @@ from __future__ import annotations
 import json
 import re
 import secrets
+from io import BytesIO
+
+from PIL import Image
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -112,6 +115,17 @@ def create_asset(*, officer_id: int, asset_code: str, name: str, category: str,
         raise ValueError("Tingkat akses tidak valid.")
     if not image_bytes:
         raise ValueError("Foto aset wajib diunggah.")
+
+    # Validasi berdasarkan format konten, bukan hanya ekstensi nama file.
+    try:
+        with Image.open(BytesIO(image_bytes)) as uploaded_image:
+            if uploaded_image.format != "PNG":
+                raise ValueError("Foto aset harus berupa file PNG.")
+            uploaded_image.verify()
+    except ValueError:
+        raise
+    except Exception as exc:
+        raise ValueError("Foto aset bukan PNG yang valid atau berkas rusak.") from exc
 
     created = _now()
     with get_connection() as conn:

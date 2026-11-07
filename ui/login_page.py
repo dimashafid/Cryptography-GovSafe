@@ -27,8 +27,9 @@ from ui.components import render_brand
 def _test_login_enabled() -> bool:
     """Bypass USB/Face hanya untuk development lokal; password + Vigenere tetap wajib."""
     enabled = os.environ.get("GOVSAFE_TEST_LOGIN_BYPASS", "").strip() == "1"
+    development = os.environ.get("GOVSAFE_ENV", "").strip().lower() == "development"
     bind_address = os.environ.get("STREAMLIT_SERVER_ADDRESS", "localhost").strip().lower()
-    return enabled and bind_address in {"localhost", "127.0.0.1", "::1"}
+    return enabled and development and bind_address in {"localhost", "127.0.0.1", "::1"}
 
 
 def _get_challenge():
@@ -346,7 +347,7 @@ def _submit_login():
             buyer["id"],
             "LOGIN_SUCCESS",
             {
-                "method": "usb+face+argon2id+vigenere"
+                "method": ("test-bypass+argon2id+vigenere" if test_bypass else "usb+face+argon2id+vigenere")
             }
         )
 

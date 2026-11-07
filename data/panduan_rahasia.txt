@@ -1,0 +1,19 @@
+GOVSAFE - PANDUAN AKSES KATALOG ASET
+====================================
+
+Panduan demonstrasi untuk pengguna dengan peran Pemohon.
+
+1. Selesaikan tantangan Caesar Cipher pada halaman Ringkasan.
+2. Unduh berkas panduan ini setelah jawaban benar.
+3. Masukkan kode akses katalog ke halaman Ringkasan.
+4. Setelah verifikasi berhasil, buka menu Katalog Aset.
+5. Pilih aset yang relevan dan ajukan Permohonan Informasi atau Permohonan Dokumen.
+6. Periksa tindak lanjut Petugas pada menu Permohonan & Pesan Aman.
+
+KODE AKSES DEMONSTRASI: GOVSAFE-ASSET-2026
+
+Catatan: tantangan Caesar dan kode statis ini hanya gerbang demonstrasi akademik,
+bukan autentikasi yang kuat atau pengganti kontrol akses berbasis akun.
+
+GOVSAFE bukan marketplace. Aplikasi tidak menyediakan transaksi jual beli,
+pembayaran, saldo, escrow, atau lelang.

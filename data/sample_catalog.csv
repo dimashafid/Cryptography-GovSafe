@@ -1,0 +1,3 @@
+sku,name,category,description,specifications,price,seller_contact,image_path,secret_note,status
+UG-001,Notebook Digital,Stationery,"Buku catatan digital fiktif untuk demonstrasi katalog.","Ukuran A5; sampul daur ulang","Rp 125.000 (simulasi)","seller001@example.invalid",sample_product.png,"Batch internal DEMO-2026",available
+UG-002,Desk Lamp Mini,Home Office,"Lampu meja mini fiktif dengan tiga tingkat pencahayaan.","USB-C; 3 tingkat cahaya","Rp 210.000 (simulasi)","seller002@example.invalid",sample_product.png,"QC code LAMP-DEMO-02",available

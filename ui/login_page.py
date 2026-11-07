@@ -300,6 +300,24 @@ def _submit_login():
 
     buyer = db_manager.get_buyer_by_username(username)
 
+    # Full bypass hanya untuk akun aktif pada mode development localhost.
+    if test_bypass:
+        if not buyer or buyer.get("account_status") != "active":
+            st.session_state["ug_password_result"] = {
+                "ok": False,
+                "message": "Username tidak ditemukan atau akun tidak aktif."
+            }
+            return
+
+        st.session_state["buyer_id"] = buyer["id"]
+        st.session_state["buyer_username"] = buyer["username"]
+        db_manager.add_log(
+            buyer["id"],
+            "LOGIN_SUCCESS",
+            {"method": "local-test-full-bypass"}
+        )
+        return
+
     password_record = None
 
     if buyer and buyer["id"] == buyer_id:
@@ -361,7 +379,7 @@ def _render_login_stage():
 
     test_bypass = _test_login_enabled()
     if test_bypass:
-        st.warning("MODE TEST LOKAL AKTIF — USB dan Face Recognition dilewati. Password dan Vigenere tetap wajib. Jangan aktifkan di deployment.")
+        st.warning("FULL TEST BYPASS AKTIF — USB, Face Recognition, password, dan Vigenere dilewati. Hanya untuk development lokal; jangan aktifkan di deployment.")
 
     if st.session_state.get("ug_usb_verified"):
         st.success("USB Dongle: berhasil diverifikasi.")
@@ -390,46 +408,47 @@ def _render_login_stage():
                 disabled=True
             )
 
-        st.text_input(
-            "PASSWORD",
-            type="password",
-            placeholder="Masukkan password Buyer",
-            key="ug_password"
-        )
-
-        _show_result("ug_password_result")
+        if not test_bypass:
+            st.text_input(
+                "PASSWORD",
+                type="password",
+                placeholder="Masukkan password Buyer",
+                key="ug_password"
+            )
+            _show_result("ug_password_result")
 
     with challenge_col:
-        challenge = _get_challenge()
+        if not test_bypass:
+            challenge = _get_challenge()
 
-        st.markdown("### Vigenere Challenge")
+            st.markdown("### Vigenere Challenge")
 
-        st.caption(
-            "Dekripsikan ciphertext menggunakan kunci yang disediakan."
-        )
+            st.caption(
+                "Dekripsikan ciphertext menggunakan kunci yang disediakan."
+            )
 
-        st.markdown("**Ciphertext**")
-        st.code(challenge["ciphertext"], language=None)
+            st.markdown("**Ciphertext**")
+            st.code(challenge["ciphertext"], language=None)
 
-        st.markdown("**Decryption key**")
-        st.code(challenge["key"], language=None)
+            st.markdown("**Decryption key**")
+            st.code(challenge["key"], language=None)
 
-        st.text_input(
-            "DECRYPTED TOKEN",
-            key="ug_token",
-            placeholder="Masukkan plaintext A-Z"
-        )
+            st.text_input(
+                "DECRYPTED TOKEN",
+                key="ug_token",
+                placeholder="Masukkan plaintext A-Z"
+            )
 
-        _show_result("ug_vigenere_result")
+            _show_result("ug_vigenere_result")
 
-        st.button(
-            "REGENERATE CHALLENGE",
-            on_click=_regenerate_challenge,
-            use_container_width=True
-        )
+            st.button(
+                "REGENERATE CHALLENGE",
+                on_click=_regenerate_challenge,
+                use_container_width=True
+            )
 
     st.button(
-        "LOGIN",
+        "MASUK MODE TEST" if test_bypass else "LOGIN",
         on_click=_submit_login,
         use_container_width=True
     )

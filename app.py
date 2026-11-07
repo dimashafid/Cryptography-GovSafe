@@ -12,6 +12,7 @@ from ui.login_page import render_login
 from ui.components import render_brand
 from ui.dashboard import render_dashboard
 from ui.govsafe_pages import render_asset_catalog, render_asset_management, render_request_center, render_ledger
+from ui.steganography_decoder import render_steganography_decoder
 
 st.set_page_config(page_title=APP_NAME, page_icon="🛡️", layout="wide", initial_sidebar_state="expanded")
 apply_styles()
@@ -55,7 +56,7 @@ role = user.get("role", "pemohon")
 role_label = "Petugas" if role == "petugas" else "Pemohon"
 
 if role == "petugas":
-    pages = ["Ringkasan", "Kelola Aset", "Permohonan & Pesan Aman", "Ledger Audit"]
+    pages = ["Ringkasan", "Kelola Aset", "Decoder Steganografi", "Permohonan & Pesan Aman", "Ledger Audit"]
 else:
     pages = ["Ringkasan", "Katalog Aset", "Permohonan & Pesan Aman", "Ledger Audit"]
 
@@ -86,6 +87,8 @@ elif page == "Katalog Aset" and role == "pemohon":
         render_asset_catalog(user)
 elif page == "Kelola Aset" and role == "petugas":
     render_asset_management(user)
+elif page == "Decoder Steganografi" and role == "petugas":
+    render_steganography_decoder()
 elif page == "Permohonan & Pesan Aman":
     render_request_center(user)
 elif page == "Ledger Audit":

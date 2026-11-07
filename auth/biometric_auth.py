@@ -14,6 +14,16 @@ def extract_face_encoding(image_bytes: bytes) -> list[float]:
     try:
         import face_recognition
         image = face_recognition.load_image_file(BytesIO(image_bytes))
+        # Batasi sisi terpanjang menjadi 640 px agar ekstraksi HOG lebih ringan.
+        # Gambar tidak diperbesar; threshold pencocokan tetap menggunakan konfigurasi.
+        if max(image.shape[:2]) > 640:
+            import numpy as np
+            from PIL import Image
+
+            resized = Image.fromarray(image)
+            resized.thumbnail((640, 640), Image.Resampling.LANCZOS)
+            image = np.asarray(resized)
+
         locations = face_recognition.face_locations(image, model="hog")
         if len(locations) != 1:
             raise ValueError("Gambar harus memuat tepat satu wajah.")

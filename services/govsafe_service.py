@@ -4,6 +4,9 @@ from __future__ import annotations
 import json
 import re
 import secrets
+from io import BytesIO
+
+from PIL import Image
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -13,7 +16,7 @@ from config import ASSET_STORAGE_PATH
 from crypto.db_crypto import encrypt_column, decrypt_column
 from crypto.file_cipher import encrypt_bytes, decrypt_bytes
 from crypto.key_manager import get_key
-from crypto.steganography import encode_message, extract_secret_data
+from crypto.steganography import encode_message
 from crypto.vigenere_aes import encrypt_message, decrypt_message
 from database.db_manager import get_connection, get_buyer_by_id
 from database.govsafe_schema import ensure_govsafe_schema
@@ -113,6 +116,17 @@ def create_asset(*, officer_id: int, asset_code: str, name: str, category: str,
     if not image_bytes:
         raise ValueError("Foto aset wajib diunggah.")
 
+    # Validasi berdasarkan format konten, bukan hanya ekstensi nama file.
+    try:
+        with Image.open(BytesIO(image_bytes)) as uploaded_image:
+            if uploaded_image.format != "PNG":
+                raise ValueError("Foto aset harus berupa file PNG.")
+            uploaded_image.verify()
+    except ValueError:
+        raise
+    except Exception as exc:
+        raise ValueError("Foto aset bukan PNG yang valid atau berkas rusak.") from exc
+
     created = _now()
     with get_connection() as conn:
         cursor = conn.execute(
@@ -121,11 +135,15 @@ def create_asset(*, officer_id: int, asset_code: str, name: str, category: str,
         )
         asset_id = int(cursor.lastrowid)
         secret_metadata = {
+            "asset_id": asset_id,
             "asset_code": code,
+            "name": name.strip(),
+            "category": category.strip(),
             "legal_status": legal_status,
+            "condition": condition,
+            "description": description.strip(),
             "storage_location": storage_location.strip(),
             "access_level": access_level,
-            "record_note": "Metadata internal GOVSAFE; tidak ditampilkan kepada Pemohon jika akses terbatas.",
         }
         stego_png = encode_message(image_bytes, secret_metadata)
         encrypted_image = encrypt_bytes(stego_png, get_key("UNDERGRID_FILE_KEY"))
@@ -183,11 +201,6 @@ def get_asset_detail(asset_id: int, *, role: str) -> dict[str, Any] | None:
     encrypted_file = Path(item["image_path"]).read_bytes()
     stego_png = decrypt_bytes(encrypted_file, get_key("UNDERGRID_FILE_KEY"))
     item["image_bytes"] = stego_png
-    if role == "petugas":
-        try:
-            item["hidden_metadata"] = extract_secret_data(stego_png)
-        except ValueError:
-            item["hidden_metadata"] = {"error": "Metadata LSB tidak dapat diekstrak."}
     item.pop("image_path", None)
     return item
 

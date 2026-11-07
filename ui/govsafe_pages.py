@@ -89,7 +89,7 @@ def render_asset_management(user: dict) -> None:
                 storage_location = st.text_input("Lokasi penyimpanan", placeholder="Lokasi internal / kode gudang")
                 access_level = st.selectbox("Keterbukaan lokasi", ["Terbatas", "Publik"], help="Lokasi Terbatas tidak ditampilkan pada akun Pemohon.")
                 description = st.text_area("Deskripsi aset", height=155)
-                image_file = st.file_uploader("Foto aset (PNG/JPG)", type=["png", "jpg", "jpeg"])
+                image_file = st.file_uploader("Foto aset (PNG)", type=["png"])
             submitted = st.form_submit_button("SIMPAN DATA ASET", use_container_width=True)
         if submitted:
             try:
@@ -101,7 +101,7 @@ def render_asset_management(user: dict) -> None:
                     storage_location=storage_location, access_level=access_level,
                     description=description, image_bytes=image_file.getvalue(),
                 )
-                st.success(f"Aset berhasil didaftarkan dengan ID {asset_id}. Data sensitif dienkripsi dan foto diproses melalui LSB + ChaCha20-Poly1305.")
+                st.success(f"Aset berhasil didaftarkan dengan ID {asset_id}.")
                 st.rerun()
             except Exception as exc:
                 st.error(str(exc))
@@ -124,9 +124,6 @@ def render_asset_management(user: dict) -> None:
                 st.write(f"**Kondisi:** {asset['condition']}")
                 st.write(f"**Lokasi:** {asset['storage_location']}")
                 st.write(f"**Tingkat akses:** {asset['access_level']}")
-                if detail and detail.get("hidden_metadata"):
-                    with st.expander("Metadata tersembunyi LSB (Petugas)"):
-                        st.json(detail["hidden_metadata"])
                 if asset["asset_status"] == "Aktif":
                     if st.button("ARSIPKAN ASET", key=f"archive_asset_{asset['id']}"):
                         try:

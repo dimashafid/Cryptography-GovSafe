@@ -2,16 +2,10 @@
 """Login Buyer bertahap: USB -> Face Recognition -> Password + Vigenere."""
 from __future__ import annotations
 
+import hashlib
 import json
-import threading
-import time
 
 import streamlit as st
-
-try:
-    from streamlit_webrtc import webrtc_streamer
-except ImportError:
-    webrtc_streamer = None
 
 from auth.cryptographic_challenge import (
     generate_challenge,
@@ -23,25 +17,10 @@ from auth.auth_dongle import (
     detect_removable_drives,
     find_dongle_file,
 )
-from auth.biometric_auth import load_encrypted_face_template
+from auth.biometric_auth import load_encrypted_face_template, verify_face
 from config import FACE_THRESHOLD
 from database import db_manager
 from ui.components import render_brand
-
-
-# ---------------------------------------------------------
-# STATE FACE RECOGNITION
-# ---------------------------------------------------------
-
-class FaceState:
-    """Status bersama antara callback video dan tampilan Streamlit."""
-
-    def __init__(self):
-        self.lock = threading.Lock()
-        self.last_check = 0.0
-        self.match_streak = 0
-        self.matched = False
-        self.message = "Menunggu kamera aktif..."
 
 
 def _get_challenge():
@@ -131,7 +110,9 @@ def _render_usb_stage():
             st.session_state["ug_usb_username"] = buyer["username"]
             st.session_state["ug_usb_verified"] = True
             st.session_state["ug_face_verified"] = False
-            st.session_state["ug_face_state"] = FaceState()
+            st.session_state.pop("ug_face_snapshot", None)
+            st.session_state.pop("ug_face_processed_digest", None)
+            st.session_state.pop("ug_face_result", None)
             st.session_state["ug_stage"] = "biometric"
 
             st.success("USB Dongle berhasil diverifikasi.")
@@ -153,231 +134,39 @@ def _render_usb_stage():
 
 
 # ---------------------------------------------------------
-# TAHAP 2: FACE RECOGNITION REALTIME
+# TAHAP 2: SNAPSHOT FACE RECOGNITION
 # ---------------------------------------------------------
 
-def _build_face_callback(known_encoding, state):
-    """Memproses maksimal sekitar tiga frame setiap detik."""
-
-    import face_recognition
-
-    def video_frame_callback(frame):
-        now = time.monotonic()
-
-        # Batasi pemrosesan menjadi maksimal sekitar 3 sampel/detik.
-        with state.lock:
-            if state.matched:
-                return frame
-
-            if now - state.last_check < (1 / 3):
-                return frame
-
-            state.last_check = now
-
-        try:
-            image = frame.to_ndarray(format="rgb24")
-
-            locations = face_recognition.face_locations(
-                image,
-                model="hog"
-            )
-
-            if len(locations) == 0:
-                message = "Wajah belum terdeteksi. Arahkan wajah ke kamera."
-                matched_now = False
-
-            elif len(locations) > 1:
-                message = (
-                    "Terdeteksi lebih dari satu wajah. "
-                    "Gunakan satu wajah saja."
-                )
-                matched_now = False
-
-            else:
-                encodings = face_recognition.face_encodings(
-                    image,
-                    known_face_locations=locations
-                )
-
-                if len(encodings) != 1:
-                    message = "Encoding wajah gagal diproses."
-                    matched_now = False
-
-                else:
-                    distance = float(
-                        face_recognition.face_distance(
-                            [known_encoding],
-                            encodings[0]
-                        )[0]
-                    )
-
-                    with state.lock:
-                        current_streak = state.match_streak
-
-                    if distance <= FACE_THRESHOLD:
-                        new_streak = current_streak + 1
-                        matched_now = new_streak >= 3
-
-                        if matched_now:
-                            message = "Wajah berhasil diverifikasi."
-                        else:
-                            message = (
-                                f"Wajah cocok. "
-                                f"Konfirmasi {new_streak}/3."
-                            )
-
-                    else:
-                        new_streak = 0
-                        matched_now = False
-                        message = "Wajah tidak cocok dengan data Buyer."
-
-                    with state.lock:
-                        state.match_streak = new_streak
-
-            if len(locations) != 1:
-                with state.lock:
-                    state.match_streak = 0
-
-            with state.lock:
-                state.message = message
-
-                if matched_now:
-                    state.matched = True
-
-        except Exception:
-            with state.lock:
-                state.match_streak = 0
-                state.matched = False
-                state.message = (
-                    "Terjadi kesalahan saat memproses video wajah."
-                )
-
-        return frame
-
-    return video_frame_callback
-
-
-def _render_live_face(known_encoding, buyer_id):
-    """Menjalankan kamera dan memantau hasil Face Recognition."""
-
-    if webrtc_streamer is None:
-        st.error(
-            "Komponen kamera belum terpasang. Jalankan perintah:"
-        )
-        st.code("python -m pip install streamlit-webrtc")
-        return
-
-    if not hasattr(st, "fragment"):
-        st.error(
-            "Versi Streamlit belum mendukung fragment. "
-            "Perbarui Streamlit terlebih dahulu."
-        )
-        return
-
-    state = st.session_state["ug_face_state"]
-
-    try:
-        callback = _build_face_callback(known_encoding, state)
-    except Exception as error:
-        st.error(
-            "Face Recognition tidak dapat dijalankan. "
-            "Periksa instalasi face_recognition dan dlib."
-        )
-        st.caption(str(error))
-        return
-
-    @st.fragment(run_every="1s")
-    def live_face_status():
-
-        # Pastikan USB yang digunakan masih sama dan masih valid.
-        current_buyer, usb_message = _find_buyer_from_usb()
-
-        if (
-            not current_buyer
-            or current_buyer["id"] != buyer_id
-        ):
-            with state.lock:
-                state.match_streak = 0
-                state.matched = False
-                state.message = "USB dongle terputus."
-
-            st.session_state["ug_usb_verified"] = False
-            st.session_state["ug_face_verified"] = False
-            st.session_state["ug_stage"] = "usb"
-            st.session_state["ug_usb_error"] = (
-                "USB dilepas atau tidak lagi valid. "
-                "Silakan pasang kembali USB dongle."
-            )
-
-            st.warning("USB dongle tidak terdeteksi.")
-            st.rerun()
-
-        ctx = webrtc_streamer(
-            key=f"ug-face-{buyer_id}",
-            video_frame_callback=callback,
-            media_stream_constraints={
-                "video": True,
-                "audio": False,
-            },
-            media_toggle_controls=False,
-            desired_playing_state=True,
-        )
-
-        with state.lock:
-            matched = state.matched
-            message = state.message
-
-        if matched and ctx.state.playing:
-            st.session_state["ug_face_verified"] = True
-            st.session_state["ug_stage"] = "login"
-
-            st.success("Face Recognition berhasil.")
-            st.rerun()
-
-        elif not ctx.state.playing:
-            with state.lock:
-                state.match_streak = 0
-                state.matched = False
-
-            st.info(
-                "Menunggu izin kamera dari browser. "
-                "Izinkan akses kamera apabila muncul permintaan izin."
-            )
-
-        else:
-            if (
-                "tidak cocok" in message.lower()
-                or "lebih dari satu" in message.lower()
-                or "gagal" in message.lower()
-                or "kesalahan" in message.lower()
-            ):
-                st.error("Biometric: " + message)
-            else:
-                st.info("Biometric: " + message)
-
-    live_face_status()
-
-
 def _render_biometric_stage():
+    """Ambil satu snapshot dan proses verifikasi wajah satu kali per foto."""
     buyer_id = st.session_state.get("ug_usb_buyer_id")
     username = st.session_state.get("ug_usb_username")
 
-    buyer = db_manager.get_buyer_by_username(username or "")
+    # Validasi ulang dongle ketika halaman biometrik dibuka/diperbarui.
+    current_buyer, usb_message = _find_buyer_from_usb()
+    if not current_buyer or current_buyer["id"] != buyer_id:
+        st.session_state["ug_usb_verified"] = False
+        st.session_state["ug_face_verified"] = False
+        st.session_state["ug_stage"] = "usb"
+        st.session_state["ug_usb_error"] = (
+            "USB dongle dilepas atau tidak lagi valid. Silakan pasang kembali."
+        )
+        st.error(st.session_state["ug_usb_error"])
+        st.rerun()
 
+    buyer = db_manager.get_buyer_by_username(username or "")
     if not buyer or buyer["id"] != buyer_id:
-        st.error("Identitas Akun dari USB tidak dapat divalidasi.")
+        st.error("Identitas akun dari USB tidak dapat divalidasi.")
         st.session_state["ug_stage"] = "usb"
         st.rerun()
 
     render_brand()
-
     st.markdown("## 02 — Biometric Verification")
-
     st.success("USB Dongle: berhasil diverifikasi.")
     st.caption("Pengguna terdeteksi: " + username)
 
     if not buyer.get("face_encoding_enc"):
-        st.error("Template wajah Pengguna belum terdaftar.")
+        st.error("Template wajah pengguna belum terdaftar.")
         st.stop()
 
     try:
@@ -389,20 +178,55 @@ def _render_biometric_stage():
         st.error("Template wajah gagal dibuka atau tidak valid.")
         st.stop()
 
-    if "ug_face_state" not in st.session_state:
-        st.session_state["ug_face_state"] = FaceState()
-
     st.caption(
-        "Kamera akan diaktifkan secara otomatis setelah browser "
-        "memberikan izin. Sistem akan memproses wajah secara berkala."
+        "Posisikan wajah di tengah pratinjau kamera, lalu tekan tombol "
+        "Ambil Foto. Sistem hanya memproses foto setelah diambil."
     )
+    snapshot = st.camera_input("Ambil Foto", key="ug_face_snapshot")
 
-    _render_live_face(reference, buyer_id)
+    if snapshot is not None:
+        image_bytes = snapshot.getvalue()
+        digest = hashlib.sha256(image_bytes).hexdigest()
+
+        # Streamlit dapat melakukan rerun; foto yang sama tidak diproses ulang.
+        if st.session_state.get("ug_face_processed_digest") != digest:
+            try:
+                matched = verify_face(
+                    image_bytes,
+                    reference,
+                    threshold=FACE_THRESHOLD
+                )
+                result = {
+                    "ok": matched,
+                    "message": (
+                        "Wajah berhasil diverifikasi."
+                        if matched
+                        else "Wajah tidak cocok dengan template akun."
+                    ),
+                }
+            except Exception as error:
+                result = {
+                    "ok": False,
+                    "message": str(error) or "Foto wajah gagal diproses.",
+                }
+
+            st.session_state["ug_face_processed_digest"] = digest
+            st.session_state["ug_face_result"] = result
+
+        result = st.session_state.get("ug_face_result", {})
+        if result.get("ok"):
+            st.session_state["ug_face_verified"] = True
+            st.session_state["ug_stage"] = "login"
+            st.success("Face Recognition berhasil.")
+            st.rerun()
+        else:
+            st.session_state["ug_face_verified"] = False
+            st.error(result.get("message", "Verifikasi wajah gagal."))
+            st.info("Silakan ambil foto ulang dengan posisi wajah yang jelas.")
 
     st.warning(
-        "Pengenalan wajah ini belum memiliki liveness detection. "
-        "Kecocokan wajah saja belum menjamin bahwa wajah berasal "
-        "dari orang hidup di depan kamera."
+        "Verifikasi ini belum memiliki liveness detection. Foto yang cocok "
+        "belum membuktikan bahwa wajah berasal dari orang hidup di depan kamera."
     )
 
 

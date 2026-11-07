@@ -14,6 +14,7 @@ from typing import Any
 from blockchain.blockchain import add_block
 from config import ASSET_STORAGE_PATH
 from crypto.db_crypto import encrypt_column, decrypt_column
+from crypto.key_manager import get_key
 from crypto.steganography import encode_message
 from crypto.vigenere_aes import encrypt_message, decrypt_message
 from database.db_manager import get_connection, get_buyer_by_id

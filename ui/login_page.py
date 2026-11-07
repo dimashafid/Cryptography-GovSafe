@@ -24,6 +24,13 @@ from database import db_manager
 from ui.components import render_brand
 
 
+def _test_login_enabled() -> bool:
+    """Bypass USB/Face hanya untuk development lokal; password + Vigenere tetap wajib."""
+    enabled = os.environ.get("GOVSAFE_TEST_LOGIN_BYPASS", "").strip() == "1"
+    bind_address = os.environ.get("STREAMLIT_SERVER_ADDRESS", "localhost").strip().lower()
+    return enabled and bind_address in {"localhost", "127.0.0.1", "::1"}
+
+
 def _get_challenge():
     if "ug_challenge" not in st.session_state:
         st.session_state["ug_challenge"] = generate_challenge()
@@ -249,29 +256,38 @@ def _regenerate_challenge():
 def _submit_login():
     """Memvalidasi USB, Face Recognition, password, dan Vigenere."""
 
-    username = st.session_state.get("ug_usb_username", "")
+    test_bypass = _test_login_enabled()
+    username = (st.session_state.get("ug_test_username", "").strip().lower()
+                if test_bypass else st.session_state.get("ug_usb_username", ""))
     buyer_id = st.session_state.get("ug_usb_buyer_id")
     password = st.session_state.get("ug_password", "")
 
-    # Pastikan seluruh tahap sebelumnya sudah berhasil.
-    if not st.session_state.get("ug_usb_verified"):
+    # Dalam mode testing, identitas tetap harus cocok dengan akun di database.
+    test_buyer = db_manager.get_buyer_by_username(username) if test_bypass and username else None
+    if test_bypass:
+        buyer_id = test_buyer["id"] if test_buyer else None
+
+    # Pastikan tahap USB dan wajah lolos pada mode normal.
+    if not test_bypass and not st.session_state.get("ug_usb_verified"):
         st.session_state["ug_password_result"] = {
             "ok": False,
             "message": "USB dongle belum diverifikasi."
         }
         return
 
-    if not st.session_state.get("ug_face_verified"):
+    if not test_bypass and not st.session_state.get("ug_face_verified"):
         st.session_state["ug_password_result"] = {
             "ok": False,
             "message": "Face Recognition belum berhasil."
         }
         return
 
-    # Validasi ulang USB saat tombol login ditekan.
-    current_buyer, usb_message = _find_buyer_from_usb()
+    # Validasi ulang USB saat login normal; dilewati hanya dalam mode test lokal.
+    current_buyer = test_buyer
+    if not test_bypass:
+        current_buyer, usb_message = _find_buyer_from_usb()
 
-    if not current_buyer or current_buyer["id"] != buyer_id:
+    if not test_bypass and (not current_buyer or current_buyer["id"] != buyer_id):
         st.session_state["ug_password_result"] = {
             "ok": False,
             "message": "USB dongle tidak valid atau telah dilepas."
@@ -342,6 +358,10 @@ def _render_login_stage():
 
     st.markdown("## 03 — Login GOVSAFE")
 
+    test_bypass = _test_login_enabled()
+    if test_bypass:
+        st.warning("MODE TEST LOKAL AKTIF — USB dan Face Recognition dilewati. Password dan Vigenere tetap wajib. Jangan aktifkan di deployment.")
+
     if st.session_state.get("ug_usb_verified"):
         st.success("USB Dongle: berhasil diverifikasi.")
 
@@ -356,11 +376,18 @@ def _render_login_stage():
     with login_col:
         st.markdown("### Login")
 
-        st.text_input(
-            "USERNAME",
-            value=username,
-            disabled=True
-        )
+        if test_bypass:
+            st.text_input(
+                "USERNAME TEST",
+                key="ug_test_username",
+                placeholder="Masukkan username akun terdaftar"
+            )
+        else:
+            st.text_input(
+                "USERNAME",
+                value=username,
+                disabled=True
+            )
 
         st.text_input(
             "PASSWORD",
@@ -418,7 +445,10 @@ def render_login():
         return
 
     if "ug_stage" not in st.session_state:
-        st.session_state["ug_stage"] = "usb"
+        st.session_state["ug_stage"] = "login" if _test_login_enabled() else "usb"
+
+    if _test_login_enabled():
+        st.session_state["ug_stage"] = "login"
 
     stage = st.session_state["ug_stage"]
 

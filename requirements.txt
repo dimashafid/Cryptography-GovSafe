@@ -1,0 +1,9 @@
+streamlit
+Pillow
+numpy
+face-recognition
+psutil
+argon2-cffi
+cryptography
+python-dotenv
+pytest

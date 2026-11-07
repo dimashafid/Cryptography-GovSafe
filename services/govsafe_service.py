@@ -14,7 +14,7 @@ from typing import Any
 from blockchain.blockchain import add_block
 from config import ASSET_STORAGE_PATH
 from crypto.db_crypto import encrypt_column, decrypt_column
-from crypto.file_cipher import encrypt_bytes, decrypt_bytes
+from crypto.file_cipher import decrypt_bytes
 from crypto.key_manager import get_key
 from crypto.steganography import encode_message
 from crypto.vigenere_aes import encrypt_message, decrypt_message
@@ -146,10 +146,10 @@ def create_asset(*, officer_id: int, asset_code: str, name: str, category: str,
             "access_level": access_level,
         }
         stego_png = encode_message(image_bytes, secret_metadata)
-        encrypted_image = encrypt_bytes(stego_png, get_key("UNDERGRID_FILE_KEY"))
+        # File aset baru disimpan sebagai PNG steganografi LSB tanpa enkripsi file.
         ASSET_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
-        image_path = ASSET_STORAGE_PATH / f"{code}.png.enc"
-        image_path.write_bytes(encrypted_image)
+        image_path = ASSET_STORAGE_PATH / f"{code}.png"
+        image_path.write_bytes(stego_png)
         values = {
             "encrypted_name": name.strip(),
             "encrypted_description": description.strip(),
@@ -198,8 +198,13 @@ def get_asset_detail(asset_id: int, *, role: str) -> dict[str, Any] | None:
     if not row:
         return None
     item = _asset_from_row(row, include_private=(role == "petugas"))
-    encrypted_file = Path(item["image_path"]).read_bytes()
-    stego_png = decrypt_bytes(encrypted_file, get_key("UNDERGRID_FILE_KEY"))
+    stored_file = Path(item["image_path"]).read_bytes()
+    # Kompatibilitas baca: file lama ber-header UGFILE tetap didekripsi.
+    # File aset baru adalah PNG LSB biasa dan tidak memerlukan kunci file.
+    if stored_file.startswith(b"UGFILE"):
+        stego_png = decrypt_bytes(stored_file, get_key("UNDERGRID_FILE_KEY"))
+    else:
+        stego_png = stored_file
     item["image_bytes"] = stego_png
     item.pop("image_path", None)
     return item

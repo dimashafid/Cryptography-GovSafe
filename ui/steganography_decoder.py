@@ -35,7 +35,7 @@ def render_steganography_decoder(user: dict) -> None:
         "Unggah gambar PNG hasil steganografi",
         type=["png"],
         key="govsafe_stego_decoder_upload",
-        help="Unggah PNG yang sudah didekripsi jika file penyimpanan internal masih berekstensi .enc.",
+        help="Unggah file PNG asli hasil penyisipan metadata LSB GOVSAFE.",
     )
     if uploaded is None:
         st.markdown(

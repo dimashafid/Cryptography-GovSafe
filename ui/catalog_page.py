@@ -19,7 +19,10 @@ def render_catalog(buyer_id: int) -> None:
     for index, product in enumerate(products):
         with cols[index % 2]:
             st.markdown('<div class="ug-card">', unsafe_allow_html=True)
+            preview = None
             try:
+                # get_product_detail mendekripsi file penyimpanan dan mempertahankan
+                # PNG steganografi asli, termasuk payload LSB yang tertanam.
                 preview = get_product_detail(int(product["id"]))
                 st.image(preview["image_bytes"], use_container_width=True)
             except Exception as exc:
@@ -28,6 +31,16 @@ def render_catalog(buyer_id: int) -> None:
             st.caption(f"{product['category']} · SKU {product['sku']}")
             st.markdown(f"**{product['price_display']}**")
             st.write(product['description'][:150] + ("…" if len(product['description']) > 150 else ""))
+            if preview and preview.get("image_bytes"):
+                st.download_button(
+                    "DOWNLOAD PNG",
+                    data=preview["image_bytes"],
+                    file_name=f"{product['sku']}.png",
+                    mime="image/png",
+                    key=f"download_png_{product['id']}",
+                    use_container_width=True,
+                    help="Unduh PNG asli yang masih berisi payload steganografi LSB GOVSAFE.",
+                )
             if st.button("VIEW DETAILS", key=f"product_{product['id']}", use_container_width=True):
                 st.session_state.selected_product_id = int(product["id"])
                 st.rerun()

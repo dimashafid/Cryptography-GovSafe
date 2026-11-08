@@ -57,7 +57,7 @@ role = user.get("role", "pemohon")
 role_label = "Petugas" if role == "petugas" else "Pemohon"
 
 if role == "petugas":
-    pages = ["Ringkasan", "Kelola Aset", "Decoder Steganografi", "Lab Kriptografi", "Permohonan & Pesan Aman", "Ledger Audit"]
+    pages = ["Dashboard", "Kelola Aset", "Decoder Steganografi", "Lab Kriptografi", "Permohonan & Pesan Aman", "Ledger Audit"]
 else:
     pages = ["Ringkasan", "Katalog Aset", "Permohonan & Pesan Aman", "Ledger Audit"]
 
@@ -78,7 +78,7 @@ with st.sidebar:
     st.markdown('<div class="ug-mono">ARGON2ID · FACE · USB · VIGENERE</div>', unsafe_allow_html=True)
     st.button("KELUAR", use_container_width=True, on_click=logout)
 
-if page == "Ringkasan":
+if page in ("Ringkasan", "Dashboard"):
     render_dashboard(user, show_catalog_gate=(role == "pemohon"))
 elif page == "Katalog Aset" and role == "pemohon":
     if not st.session_state.get("govsafe_catalog_unlocked", False):

@@ -59,7 +59,7 @@ role_label = "Petugas" if role == "petugas" else "Pemohon"
 if role == "petugas":
     pages = ["Dashboard", "Kelola Aset", "Decoder Steganografi", "Lab Kriptografi", "Permohonan & Pesan Aman", "Ledger Audit"]
 else:
-    pages = ["Ringkasan", "Katalog Aset", "Permohonan & Pesan Aman", "Ledger Audit"]
+    pages = ["Ringkasan", "Katalog Aset", "Permohonan & Pesan Aman"]
 
 if st.session_state.pop("govsafe_go_catalog", False):
     st.session_state["govsafe_nav"] = "Katalog Aset"
@@ -94,5 +94,5 @@ elif page == "Lab Kriptografi" and role == "petugas":
     render_crypto_trace()
 elif page == "Permohonan & Pesan Aman":
     render_request_center(user)
-elif page == "Ledger Audit":
+elif page == "Ledger Audit" and role == "petugas":
     render_ledger()

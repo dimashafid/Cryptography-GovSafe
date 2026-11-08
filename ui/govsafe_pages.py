@@ -52,7 +52,7 @@ def render_asset_catalog(user: dict) -> None:
                     role=user.get("role", "pemohon"),
                 )
                 st.download_button(
-                    "UNDUH PNG UNTUK DEKODE LSB",
+                    "Download PNG",
                     data=downloadable_png,
                     file_name=f"{detail['asset_code']}.png",
                     mime="image/png",

@@ -45,6 +45,25 @@ def render_asset_catalog(user: dict) -> None:
         c1, c2 = st.columns([1, 1.2])
         with c1:
             st.image(detail["image_bytes"], use_container_width=True)
+            try:
+                downloadable_png = gov.prepare_asset_download_png(
+                    detail["image_bytes"],
+                    access_level=detail["access_level"],
+                    role=user.get("role", "pemohon"),
+                )
+                st.download_button(
+                    "UNDUH PNG UNTUK DEKODE LSB",
+                    data=downloadable_png,
+                    file_name=f"{detail['asset_code']}.png",
+                    mime="image/png",
+                    key=f"govsafe_download_stego_{detail['id']}",
+                    use_container_width=True,
+                    help="Unduh salinan PNG yang mempertahankan payload steganografi LSB GOVSAFE.",
+                )
+                if detail["access_level"] == "Terbatas":
+                    st.caption("Pada salinan unduhan, informasi lokasi terbatas disamarkan di dalam payload LSB.")
+            except Exception as exc:
+                st.warning(f"PNG belum dapat disiapkan untuk diunduh: {exc}")
         with c2:
             st.write(detail["description"])
             st.write(f"**Kode aset:** {detail['asset_code']}")

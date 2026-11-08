@@ -16,7 +16,7 @@ from config import ASSET_STORAGE_PATH
 from crypto.db_crypto import encrypt_column, decrypt_column
 from crypto.file_cipher import decrypt_bytes
 from crypto.key_manager import get_key
-from crypto.steganography import encode_message
+from crypto.steganography import decode_message, encode_message
 from crypto.vigenere_aes import encrypt_message, decrypt_message
 from database.db_manager import get_connection, get_buyer_by_id
 from database.govsafe_schema import ensure_govsafe_schema
@@ -273,6 +273,25 @@ def get_asset_detail(asset_id: int, *, role: str) -> dict[str, Any] | None:
     item["image_bytes"] = stego_png
     item.pop("image_path", None)
     return item
+
+
+def prepare_asset_download_png(image_bytes: bytes, *, access_level: str, role: str) -> bytes:
+    """Siapkan PNG untuk Pemohon; samarkan lokasi pada payload LSB jika akses terbatas."""
+    if role != "pemohon":
+        raise PermissionError("Unduhan PNG katalog ini hanya tersedia untuk Pemohon.")
+    if access_level != "Terbatas":
+        return image_bytes
+
+    # Steganografi LSB bukan enkripsi. Jangan membocorkan lokasi terbatas melalui
+    # payload tersembunyi pada PNG yang diunduh Pemohon.
+    snapshot = decode_message(image_bytes)
+    if not isinstance(snapshot, dict):
+        raise ValueError("Metadata steganografi aset tidak memiliki struktur yang dapat disamarkan.")
+    if "storage_location" in snapshot:
+        snapshot = dict(snapshot)
+        snapshot["storage_location"] = "Informasi lokasi dibatasi"
+        return encode_message(image_bytes, snapshot)
+    return image_bytes
 
 
 def create_request(*, applicant_id: int, asset_id: int, request_type: str, subject: str, details: str) -> int:

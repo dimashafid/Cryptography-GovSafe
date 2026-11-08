@@ -1,15 +1,26 @@
 """Komponen UI reusable GOVSAFE."""
+from pathlib import Path
+
 import streamlit as st
 
 
 def render_brand() -> None:
-    st.markdown("""
-    <div style="padding:10px 0 25px">
-      <div class="ug-eyebrow">GOVERNMENT ASSET INFORMATION SYSTEM</div>
-      <div style="font-size:27px;font-weight:800;letter-spacing:-1.4px;color:#f4f7fb">GOV<span style="color:#69c6a0">SAFE</span></div>
-      <div style="font-size:11px;color:#9baabd">Secure Asset Records · Verified Communication</div>
-    </div>
-    """, unsafe_allow_html=True)
+    """Render emblem dan wordmark GOVSAFE pada sisi kiri header/sidebar."""
+    logo_path = Path(__file__).resolve().parents[1] / "assets" / "govsafe-mark.svg"
+    logo_svg = logo_path.read_text(encoding="utf-8")
+    st.markdown(
+        f"""
+        <div class="ug-brand">
+          <div class="ug-brand-mark">{logo_svg}</div>
+          <div class="ug-brand-copy">
+            <div class="ug-brand-kicker">GOVERNMENT ASSET SECURITY</div>
+            <div class="ug-brand-name">GOV<span>SAFE</span></div>
+            <div class="ug-brand-tagline">Secure · Verify · Preserve</div>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def stat_card(label: str, value: str, detail: str = "") -> None:

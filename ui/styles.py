@@ -11,7 +11,24 @@ def apply_styles() -> None:
     .stApp { background:radial-gradient(circle at 80% 0%,#1b3042 0%,#0d1521 48%); color:#eaf0f7; }
     [data-testid="stSidebar"] { background:#09111b; border-right:1px solid var(--ug-border); }
     [data-testid="stSidebar"] * { color:#dce6f0; }
-    /* Navigasi sidebar modern: hilangkan radio-dot dan tampilkan item sebagai menu minimalis. */
+    .ug-brand {
+      display:flex; align-items:center; gap:12px; padding:7px 0 24px;
+      border-bottom:1px solid rgba(105,198,160,.18); margin-bottom:17px;
+    }
+    .ug-brand-mark { width:54px; height:54px; flex:0 0 54px; }
+    .ug-brand-mark svg { width:100%; height:100%; display:block; }
+    .ug-brand-copy { min-width:0; }
+    .ug-brand-kicker {
+      color:#91a6b8; font:500 8px 'DM Mono',monospace; letter-spacing:.11em;
+      white-space:nowrap;
+    }
+    .ug-brand-name {
+      color:#f4f7fb; font-size:27px; line-height:1.12; font-weight:800;
+      letter-spacing:-1.35px;
+    }
+    .ug-brand-name span { color:#69c6a0; }
+    .ug-brand-tagline { color:#9baabd; font-size:10px; margin-top:3px; letter-spacing:.02em; }
+    /* Navigasi sidebar minimalis tanpa radio-dot. */
     [data-testid="stSidebar"] [data-testid="stRadio"] > label { display:none; }
     [data-testid="stSidebar"] div[role="radiogroup"] { gap:6px; }
     [data-testid="stSidebar"] div[role="radiogroup"] label {

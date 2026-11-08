@@ -5,7 +5,6 @@ import streamlit as st
 
 from auth.password_auth import hash_password
 from crypto.db_crypto import encrypt_column_trace
-from crypto.file_cipher import encrypt_bytes_trace
 from crypto.key_manager import get_key
 from crypto.vigenere_aes import encrypt_message_trace
 from ui.styles import render_page_heading
@@ -27,7 +26,6 @@ def render_crypto_trace() -> None:
     tabs = st.tabs([
         "Pesan · Vigenère + AES-CBC + HMAC",
         "Database · AES-GCM",
-        "File · ChaCha20-Poly1305",
         "Password · Argon2id",
     ])
 
@@ -75,29 +73,6 @@ def render_crypto_trace() -> None:
             )
 
     with tabs[2]:
-        st.write("ChaCha20-Poly1305 tersedia untuk enkripsi file. Foto aset GOVSAFE yang baru tetap disimpan sebagai PNG LSB polos agar dapat didekode secara independen.")
-        file_data = st.text_area("Konten file contoh", key="trace_file_plaintext", height=90)
-        if st.button("JALANKAN CHACHA20-POLY1305", key="trace_file_run", use_container_width=True):
-            try:
-                result = encrypt_bytes_trace(file_data.encode("utf-8"), get_key("UNDERGRID_FILE_KEY"))
-                st.session_state["trace_file_result"] = {
-                    "stages": result["stages"],
-                    "blob_hex": result["blob"].hex(),
-                }
-            except Exception as exc:
-                st.error(f"Enkripsi file gagal: {exc}")
-        result = st.session_state.get("trace_file_result")
-        if result:
-            _show_stages(result["stages"])
-            st.download_button(
-                "UNDUH CONTOH FILE TERENKRIPSI (HEX)",
-                data=result["blob_hex"].encode("ascii"),
-                file_name="govsafe_file_ciphertext.hex",
-                mime="text/plain",
-                use_container_width=True,
-            )
-
-    with tabs[3]:
         st.write("Argon2id adalah fungsi hash password satu arah, bukan algoritma enkripsi. GOVSAFE menggunakan time_cost=3, memory_cost=65536 KiB, parallelism=2.")
         password = st.text_input("Password contoh (minimal 10 karakter)", type="password", key="trace_argon_password")
         if st.button("JALANKAN ARGON2ID", key="trace_argon_run", use_container_width=True):

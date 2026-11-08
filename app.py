@@ -13,6 +13,7 @@ from ui.components import render_brand
 from ui.dashboard import render_dashboard
 from ui.govsafe_pages import render_asset_catalog, render_asset_management, render_request_center, render_ledger
 from ui.steganography_decoder import render_steganography_decoder
+from ui.crypto_trace import render_crypto_trace
 
 st.set_page_config(page_title=APP_NAME, page_icon="🛡️", layout="wide", initial_sidebar_state="expanded")
 apply_styles()
@@ -56,7 +57,7 @@ role = user.get("role", "pemohon")
 role_label = "Petugas" if role == "petugas" else "Pemohon"
 
 if role == "petugas":
-    pages = ["Ringkasan", "Kelola Aset", "Decoder Steganografi", "Permohonan & Pesan Aman", "Ledger Audit"]
+    pages = ["Ringkasan", "Kelola Aset", "Decoder Steganografi", "Lab Kriptografi", "Permohonan & Pesan Aman", "Ledger Audit"]
 else:
     pages = ["Ringkasan", "Katalog Aset", "Permohonan & Pesan Aman", "Ledger Audit"]
 
@@ -88,7 +89,9 @@ elif page == "Katalog Aset" and role == "pemohon":
 elif page == "Kelola Aset" and role == "petugas":
     render_asset_management(user)
 elif page == "Decoder Steganografi" and role == "petugas":
-    render_steganography_decoder()
+    render_steganography_decoder(user)
+elif page == "Lab Kriptografi" and role == "petugas":
+    render_crypto_trace()
 elif page == "Permohonan & Pesan Aman":
     render_request_center(user)
 elif page == "Ledger Audit":

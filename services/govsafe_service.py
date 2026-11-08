@@ -24,6 +24,7 @@ from database.govsafe_schema import ensure_govsafe_schema
 VALID_ROLES = {"pemohon", "petugas"}
 REQUEST_STATUSES = ("Menunggu", "Diproses", "Dijawab", "Ditutup")
 LEGAL_STATUSES = ("Barang sitaan", "Barang rampasan negara", "Barang bukti", "Status dalam verifikasi")
+ASSET_CATEGORIES = ("Kendaraan", "Elektronik", "Properti", "Mesin dan peralatan", "Barang bernilai", "Lainnya")
 
 
 def _now() -> str:
@@ -176,6 +177,67 @@ def _asset_from_row(row, *, include_private: bool) -> dict[str, Any]:
     return item
 
 
+
+def update_asset_catalog(*, officer_id: int, asset_id: int, name: str, category: str,
+                         legal_status: str, condition: str, storage_location: str,
+                         access_level: str, description: str) -> None:
+    """Perbarui metadata katalog di database tanpa mengubah PNG/metadata snapshot LSB."""
+    ensure_govsafe_schema()
+    if _user_role(officer_id) != "petugas":
+        raise PermissionError("Hanya Petugas yang dapat mengubah metadata katalog.")
+    values = {
+        "name": name.strip() if isinstance(name, str) else "",
+        "category": category.strip() if isinstance(category, str) else "",
+        "condition": condition.strip() if isinstance(condition, str) else "",
+        "description": description.strip() if isinstance(description, str) else "",
+        "storage_location": storage_location.strip() if isinstance(storage_location, str) else "",
+    }
+    if not all(values.values()):
+        raise ValueError("Nama, kategori, kondisi, deskripsi, dan lokasi wajib diisi.")
+    if values["category"] not in ASSET_CATEGORIES:
+        raise ValueError("Kategori aset tidak dikenal.")
+    if legal_status not in LEGAL_STATUSES:
+        raise ValueError("Status hukum aset tidak dikenal.")
+    if access_level not in ("Publik", "Terbatas"):
+        raise ValueError("Tingkat akses tidak valid.")
+
+    encrypted_values = {
+        "encrypted_name": _enc("govsafe_assets", "encrypted_name", int(asset_id), values["name"]),
+        "encrypted_description": _enc("govsafe_assets", "encrypted_description", int(asset_id), values["description"]),
+        "encrypted_condition": _enc("govsafe_assets", "encrypted_condition", int(asset_id), values["condition"]),
+        "encrypted_storage_location": _enc("govsafe_assets", "encrypted_storage_location", int(asset_id), values["storage_location"]),
+    }
+    with get_connection() as conn:
+        row = conn.execute("SELECT id FROM govsafe_assets WHERE id=?", (int(asset_id),)).fetchone()
+        if not row:
+            raise LookupError("Aset tidak ditemukan.")
+        cursor = conn.execute(
+            """UPDATE govsafe_assets
+               SET category=?, legal_status=?, access_level=?,
+                   encrypted_name=?, encrypted_description=?, encrypted_condition=?,
+                   encrypted_storage_location=?, updated_at=?
+               WHERE id=?""",
+            (
+                values["category"], legal_status, access_level,
+                encrypted_values["encrypted_name"], encrypted_values["encrypted_description"],
+                encrypted_values["encrypted_condition"], encrypted_values["encrypted_storage_location"],
+                _now(), int(asset_id),
+            ),
+        )
+        if cursor.rowcount != 1:
+            raise LookupError("Metadata aset tidak berhasil diperbarui.")
+
+    # Audit hanya menyimpan daftar nama field; nilai deskripsi/lokasi tidak dimasukkan ke ledger.
+    add_block(
+        "ASSET_CATALOG_UPDATED",
+        {
+            "asset_id": int(asset_id),
+            "officer_id": int(officer_id),
+            "changed_fields": ["name", "category", "legal_status", "condition", "description", "storage_location", "access_level"],
+            "image_snapshot_changed": False,
+        },
+    )
+
 def list_assets(*, role: str, include_inactive: bool = False) -> list[dict[str, Any]]:
     ensure_govsafe_schema()
     if role not in VALID_ROLES:
@@ -198,7 +260,10 @@ def get_asset_detail(asset_id: int, *, role: str) -> dict[str, Any] | None:
     if not row:
         return None
     item = _asset_from_row(row, include_private=(role == "petugas"))
-    stored_file = Path(item["image_path"]).read_bytes()
+    try:
+        stored_file = Path(item["image_path"]).read_bytes()
+    except OSError as exc:
+        raise FileNotFoundError("Berkas foto aset tidak ditemukan. Metadata katalog tetap tersimpan di database.") from exc
     # Kompatibilitas baca: file lama ber-header UGFILE tetap didekripsi.
     # File aset baru adalah PNG LSB biasa dan tidak memerlukan kunci file.
     if stored_file.startswith(b"UGFILE"):

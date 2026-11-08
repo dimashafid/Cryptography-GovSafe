@@ -11,6 +11,20 @@ def apply_styles() -> None:
     .stApp { background:radial-gradient(circle at 80% 0%,#1b3042 0%,#0d1521 48%); color:#eaf0f7; }
     [data-testid="stSidebar"] { background:#09111b; border-right:1px solid var(--ug-border); }
     [data-testid="stSidebar"] * { color:#dce6f0; }
+    /* Navigasi sidebar modern: hilangkan radio-dot dan tampilkan item sebagai menu minimalis. */
+    [data-testid="stSidebar"] [data-testid="stRadio"] > label { display:none; }
+    [data-testid="stSidebar"] div[role="radiogroup"] { gap:6px; }
+    [data-testid="stSidebar"] div[role="radiogroup"] label {
+      background:transparent; border:1px solid transparent; border-radius:10px;
+      padding:9px 12px; margin:0; transition:background .15s ease,border-color .15s ease;
+    }
+    [data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child { display:none !important; }
+    [data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
+      background:rgba(105,198,160,.12); border-color:rgba(105,198,160,.3);
+    }
+    [data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+      background:rgba(255,255,255,.055); border-color:var(--ug-border);
+    }
     h1,h2,h3 { letter-spacing:-.035em; }
     .ug-eyebrow { color:var(--ug-green); font:500 11px 'DM Mono',monospace; letter-spacing:.17em; text-transform:uppercase; }
     .ug-title { color:#f2f6fb; font-size:34px; font-weight:800; letter-spacing:-.05em; margin:3px 0 5px; }

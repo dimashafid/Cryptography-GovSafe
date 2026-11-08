@@ -124,6 +124,41 @@ def render_asset_management(user: dict) -> None:
                 st.write(f"**Kondisi:** {asset['condition']}")
                 st.write(f"**Lokasi:** {asset['storage_location']}")
                 st.write(f"**Tingkat akses:** {asset['access_level']}")
+
+                with st.form(f"edit_asset_catalog_{asset['id']}"):
+                    st.markdown("**Edit metadata katalog**")
+                    categories = list(gov.ASSET_CATEGORIES)
+                    if asset["category"] not in categories:
+                        categories.append(asset["category"])
+                    edit_name = st.text_input("Nama aset", value=asset["name"])
+                    edit_category = st.selectbox("Kategori", categories, index=categories.index(asset["category"]))
+                    legal_options = list(gov.LEGAL_STATUSES)
+                    edit_legal = st.selectbox("Status hukum", legal_options, index=legal_options.index(asset["legal_status"]))
+                    edit_condition = st.text_input("Kondisi", value=asset["condition"])
+                    edit_description = st.text_area("Deskripsi / isi katalog", value=asset["description"], height=110)
+                    edit_location = st.text_input("Lokasi penyimpanan", value=asset["storage_location"])
+                    access_options = ["Terbatas", "Publik"]
+                    edit_access = st.selectbox("Tingkat akses", access_options, index=access_options.index(asset["access_level"]))
+                    save_edit = st.form_submit_button("SIMPAN PERUBAHAN KATALOG", use_container_width=True)
+
+                if save_edit:
+                    try:
+                        gov.update_asset_catalog(
+                            officer_id=int(user["id"]),
+                            asset_id=int(asset["id"]),
+                            name=edit_name,
+                            category=edit_category,
+                            legal_status=edit_legal,
+                            condition=edit_condition,
+                            description=edit_description,
+                            storage_location=edit_location,
+                            access_level=edit_access,
+                        )
+                        st.success("Metadata katalog diperbarui. PNG dan metadata snapshot LSB tidak diubah.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Metadata aset gagal diperbarui: {exc}")
+
                 if asset["asset_status"] == "Aktif":
                     if st.button("ARSIPKAN ASET", key=f"archive_asset_{asset['id']}"):
                         try:

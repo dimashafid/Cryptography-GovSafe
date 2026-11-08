@@ -45,3 +45,26 @@ def encrypt_json(value: object, key: bytes, aad: str | bytes) -> bytes:
 def decrypt_json(blob: bytes, key: bytes, aad: str | bytes) -> object:
     """Dekripsi dan parse JSON."""
     return json.loads(decrypt_column(blob, key, aad).decode("utf-8"))
+
+
+def encrypt_column_trace(value: str | bytes, key: bytes, aad: str | bytes) -> dict:
+    """Enkripsi AES-GCM satu kolom dan tampilkan parameter publik tanpa kunci."""
+    if len(key) != 32:
+        raise ValueError("Kunci AES-GCM harus 32 byte.")
+    plaintext = value.encode("utf-8") if isinstance(value, str) else bytes(value)
+    aad_bytes = _aad_bytes(aad)
+    nonce = secrets.token_bytes(NONCE_SIZE)
+    authenticated = AESGCM(key).encrypt(nonce, plaintext, aad_bytes)
+    ciphertext, tag = authenticated[:-16], authenticated[-16:]
+    blob = MAGIC + bytes([VERSION]) + nonce + authenticated
+    return {
+        "blob": blob,
+        "stages": [
+            {"name": "Plaintext", "detail": f"Nilai kolom sebelum enkripsi: {len(plaintext)} byte.", "value": plaintext[:512].hex(" ")},
+            {"name": "Associated Data (AAD)", "detail": "AAD tidak dienkripsi, tetapi terikat pada autentikasi ciphertext.", "value": aad_bytes.hex(" ")},
+            {"name": "Nonce", "detail": "Nonce 96-bit acak dan unik untuk setiap operasi enkripsi.", "value": nonce.hex()},
+            {"name": "AES-256-GCM", "detail": "Ciphertext dihasilkan dengan AES-GCM. Kunci tidak ditampilkan.", "value": ciphertext[:512].hex(" ")},
+            {"name": "Authentication tag", "detail": "Tag 128-bit dipakai untuk mendeteksi perubahan data atau AAD.", "value": tag.hex()},
+            {"name": "Format penyimpanan", "detail": "Header UGDB + versi + nonce + ciphertext + tag.", "value": blob.hex()[:2048]},
+        ],
+    }

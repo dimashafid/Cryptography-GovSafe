@@ -104,3 +104,31 @@ def decrypt_message(token: str, *, vigenere_key: str | None = None,
     unpadder = padding.PKCS7(BLOCK_SIZE).unpadder()
     intermediate = unpadder.update(padded) + unpadder.finalize()
     return vigenere_decrypt(intermediate.decode("utf-8"), vkey)
+
+
+def encrypt_message_trace(plaintext: str, *, vigenere_key: str | None = None,
+                          aes_key: bytes | None = None, hmac_key: bytes | None = None) -> dict:
+    """Jalankan enkripsi pesan dan kembalikan tahapan demonstrasi tanpa membuka kunci."""
+    vkey, akey, mkey = _load_keys(vigenere_key, aes_key, hmac_key)
+    vigenere_text = vigenere_encrypt(plaintext, vkey)
+    intermediate = vigenere_text.encode("utf-8")
+    padder = padding.PKCS7(BLOCK_SIZE).padder()
+    padded = padder.update(intermediate) + padder.finalize()
+    iv = secrets.token_bytes(IV_SIZE)
+    encryptor = Cipher(algorithms.AES(akey), modes.CBC(iv)).encryptor()
+    ciphertext = encryptor.update(padded) + encryptor.finalize()
+    body = MAGIC + iv + ciphertext
+    tag = hmac.new(mkey, body, hashlib.sha256).digest()
+    token = base64.urlsafe_b64encode(body + tag).decode("ascii")
+    return {
+        "ciphertext": token,
+        "stages": [
+            {"name": "Plaintext", "detail": f"{len(plaintext.encode('utf-8'))} byte UTF-8 sebelum transformasi.", "value": plaintext},
+            {"name": "Vigenere", "detail": "Substitusi polialfabetik diterapkan pada huruf ASCII; karakter non-huruf dipertahankan.", "value": vigenere_text},
+            {"name": "Encoding UTF-8", "detail": f"{len(intermediate)} byte hasil Vigenere.", "value": intermediate.hex(" ")},
+            {"name": "Padding PKCS7", "detail": f"Data dipadding ke kelipatan blok AES 16 byte; panjang akhir {len(padded)} byte.", "value": padded.hex(" ")},
+            {"name": "AES-256-CBC", "detail": "Ciphertext dibuat dengan IV acak 16 byte. Kunci AES tidak ditampilkan.", "value": f"IV: {iv.hex()}\nCiphertext: {ciphertext.hex()}"},
+            {"name": "HMAC-SHA256", "detail": "Tag autentikasi dihitung atas header, IV, dan ciphertext (Encrypt-then-MAC). Kunci HMAC tidak ditampilkan.", "value": tag.hex()},
+            {"name": "Token akhir", "detail": "Header + IV + ciphertext + tag dikodekan dengan Base64 URL-safe.", "value": token},
+        ],
+    }
